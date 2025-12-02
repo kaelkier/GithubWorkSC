@@ -1,0 +1,64 @@
+name: Scheduled Workflow
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  random-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Decide whether to commit today
+        id: decide
+        run: |
+          # 0-100 (chance to commit 40%)
+          CHANCE=$((RANDOM % 100))
+          if [ $CHANCE -lt 40 ]; then
+            echo "commit=yes" >> $GITHUB_OUTPUT
+          else
+            echo "commit=no" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stop if no commit today
+        if: steps.decide.outputs.commit == 'no'
+        run: echo "Skipping commit this run (natural idle day)."
+
+      - name: Random Delay (simulate human timing)
+        if: steps.decide.outputs.commit == 'yes'
+        run: |
+          # Random delay 1–1800 seconds (0–30 minutes)
+          DELAY=$((RANDOM % 1800))
+          echo "Sleeping $DELAY seconds..."
+          sleep $DELAY
+
+      - name: Make small change
+        if: steps.decide.outputs.commit == 'yes'
+        run: |
+          mkdir -p natural_activity
+          echo "Update at $(date)" >> natural_activity/log.txt
+
+      - name: Random commit message
+        if: steps.decide.outputs.commit == 'yes'
+        id: message
+        run: |
+          msgs=("Update logs" "Refactor minor changes" "Small update" "Daily maintenance" "Minor tweak" "Improve flow" "Adjust timestamp" "Routine update")
+          # Pick random message
+          msg=${msgs[$RANDOM % ${#msgs[@]}]}
+          echo "msg=$msg" >> $GITHUB_OUTPUT
+
+      - name: Commit & Push
+        if: steps.decide.outputs.commit == 'yes'
+        run: |
+          git config --global user.name "kaelkier"
+          git config --global user.email "rndiaditya.pratama@gmail.com"
+
+          git add .
+          git commit -m "${{ steps.message.outputs.msg }} ($(date))" || true
+          git push
