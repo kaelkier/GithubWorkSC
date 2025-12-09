@@ -5,60 +5,84 @@ permissions:
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # Weekday
+    - cron: "0 2 * * 1-5"
+    - cron: "0 3 * * 1-5"    
+    - cron: "0 4 * * 1-5"
+    - cron: "0 6 * * 1-5"
+    - cron: "0 7 * * 1-5"
+    - cron: "0 8 * * 1-5"
+    - cron: "30 11 * * 1-5"
+    - cron: "30 12 * * 1-5"
+    - cron: "30 13 * * 1-5"
+    
+    # Weekend
+    - cron: "0 3 * * 6,0"
+    - cron: "0 7 * * 6,0"
+    - cron: "0 13 * * 6,0"
+    
   workflow_dispatch:
 
 jobs:
-  random-commit:
+  natural-commit:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Decide whether to commit today
-        id: decide
+        
+      - name: Determine day type & chance
+        id: chance
         run: |
-          # 0-100 (chance to commit 40%)
-          CHANCE=$((RANDOM % 100))
-          if [ $CHANCE -lt 40 ]; then
-            echo "commit=yes" >> $GITHUB_OUTPUT
+          DAY=$(date +%u)   # 1=Mon ... 7=Sun
+          
+          if [ "$DAY" -le 5 ]; then
+            # Weekday (Mon-Fri)
+            CHANCE=40
           else
-            echo "commit=no" >> $GITHUB_OUTPUT
+            # Weekend (Sat-Sun)
+            CHANCE=20
           fi
-
-      - name: Stop if no commit today
-        if: steps.decide.outputs.commit == 'no'
-        run: echo "Skipping commit this run (natural idle day)."
-
-      - name: Random Delay (simulate human timing)
-        if: steps.decide.outputs.commit == 'yes'
+          
+          DRAW=$((RANDOM % 100))
+          
+          if [ $DRAW -lt $CHANCE ]; then
+            echo "go=yes" >> $GITHUB_OUTPUT
+          else
+            echo "go=no" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Stop if not selected
+        if: steps.chance.outputs.go == 'no'
+        run: echo "No commit this run (natural inactivity)."
+        
+      - name: Random Delay (0–20 minutes)
+        if: steps.chance.outputs.go == 'yes'
         run: |
-          # Random delay 1–1800 seconds (0–30 minutes)
-          DELAY=$((RANDOM % 1800))
-          echo "Sleeping $DELAY seconds..."
+          DELAY=$((RANDOM % 1200))
+          echo "Sleeping for $DELAY seconds..."
           sleep $DELAY
-
+          
       - name: Make small change
-        if: steps.decide.outputs.commit == 'yes'
+        if: steps.chance.outputs.go == 'yes'
         run: |
           mkdir -p natural_activity
           echo "Update at $(date)" >> natural_activity/log.txt
-
+          
       - name: Random commit message
-        if: steps.decide.outputs.commit == 'yes'
-        id: message
+        if: steps.chance.outputs.go == 'yes'
+        id: msg
         run: |
-          msgs=("Update logs" "Refactor minor changes" "Small update" "Daily maintenance" "Minor tweak" "Improve flow" "Adjust timestamp" "Routine update")
-          # Pick random message
-          msg=${msgs[$RANDOM % ${#msgs[@]}]}
-          echo "msg=$msg" >> $GITHUB_OUTPUT
-
+          msgs=("Update logs" "Small fix" "Minor tweak" "Refactor small part" "Improve flow" "Adjust timestamp" "Routine maintenance" "Optimize detail")
+          message=${msgs[$RANDOM % ${#msgs[@]}]}
+          echo "message=$message" >> $GITHUB_OUTPUT
+          
       - name: Commit & Push
-        if: steps.decide.outputs.commit == 'yes'
+        if: steps.chance.outputs.go == 'yes'
         run: |
-          git config --global user.name "kaelkier"
-          git config --global user.email "rndiaditya.pratama@gmail.com"
-
+          git config user.name "kaelkier"
+          git config user.email "rndiaditya.pratama@gmail.com"
+          
           git add .
-          git commit -m "${{ steps.message.outputs.msg }} ($(date))" || true
+          git commit -m "${{ steps.msg.outputs.message }} ($(date))" || true
           git push
